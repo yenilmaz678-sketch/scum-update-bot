@@ -10,15 +10,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Get SCUM news
+      - name: Fetch SCUM news
         run: |
-          curl -s https://store.steampowered.com/feeds/news/app/513710/ > feed.xml
-          TITLE=$(grep -oPm2 "(?<=<title>).*?(?=</title>)" feed.xml | sed -n '2p')
-
+          curl -s "https://store.steampowered.com/feeds/news/app/513710/" -o feed.xml
+          TITLE=$(grep -oP '<title>.*?</title>' feed.xml | sed -n '2p' | sed 's/<[^>]*>//g')
           echo "TITLE=$TITLE" >> $GITHUB_ENV
 
       - name: Send to Discord
         run: |
-          curl -H "Content-Type: application/json" \
+          curl -X POST -H "Content-Type: application/json" \
           -d "{\"content\":\"📢 SCUM Update: $TITLE\"}" \
-     https://discord.com/api/webhooks/1499484638878498996/uMs11agj7w4f-ztTFUKFZ5Tr3DJ6d404ljOoNram4wG-GJtl8610TJJKlEuX49l6wQ-v
+          https://discord.com/api/webhooks/1499484638878498996/uMs11agj7w4f-ztTFUKFZ5Tr3DJ6d404ljOoNram4wG-GJtl8610TJJKlEuX49l6wQ-v
