@@ -1,4 +1,4 @@
-name: SCUM Açıklamalı Bot
+name: SCUM AI Özet Bot
 
 on:
   workflow_dispatch:
@@ -12,32 +12,33 @@ jobs:
     steps:
       - name: Haber çek
         run: |
-          curl -s https://store.steampowered.com/feeds/news/app/513710/ > feed.xml
+          curl -s https://store.steampowered.com/feeds/news/app/513710/ > feed.xml || true
 
-          BASLIK=$(grep -oP '<title>.*?</title>' feed.xml | sed -n '2p' | sed 's/<[^>]*>//g')
-          LINK=$(grep -oP '<link>.*?</link>' feed.xml | sed -n '2p' | sed 's/<[^>]*>//g')
+          BASLIK=$(grep -oP '<title>.*?</title>' feed.xml 2>/dev/null | sed -n '2p' | sed 's/<[^>]*>//g')
+          LINK=$(grep -oP '<link>.*?</link>' feed.xml 2>/dev/null | sed -n '2p' | sed 's/<[^>]*>//g')
 
           echo "$BASLIK" > baslik.txt
           echo "$LINK" > link.txt
 
-      - name: İçerik çek (patch notes)
+      - name: İçerik çek
         run: |
           LINK=$(cat link.txt)
+          curl -s "$LINK" > page.html || true
 
-          # Sayfanın içeriğini çek
-          curl -s "$LINK" > page.html
+          # Patch maddelerini çek
+          grep -oP '<li>.*?</li>' page.html 2>/dev/null | sed 's/<[^>]*>//g' > raw.txt
 
-          # Liste maddelerini çek (ilk 8 madde)
-          OZET=$(grep -oP '<li>.*?</li>' page.html | sed 's/<[^>]*>//g' | head -n 8)
-
-          # Eğer boşsa fallback
-          if [ -z "$OZET" ]; then
-            OZET="Detaylar için linke tıkla."
+      - name: AI tarzı özet oluştur
+        run: |
+          if [ ! -s raw.txt ]; then
+            echo "🔹 Yeni güncelleme yayınlandı." > ozet.txt
+            echo "🔹 Detaylar için linke bak." >> ozet.txt
+          else
+            echo "🔧 Özet:" > ozet.txt
+            head -n 5 raw.txt | sed 's/^/• /' >> ozet.txt
           fi
 
-          echo "$OZET" > ozet.txt
-
-      - name: Discord'a gönder
+      - name: Discord gönder
         run: |
           BASLIK=$(cat baslik.txt)
           LINK=$(cat link.txt)
@@ -48,13 +49,13 @@ jobs:
           PAYLOAD=$(printf '{
             "embeds":[{
               "title":"📢 SCUM GÜNCELLEME",
-              "description":"**%s**\n\n🔧 Gelen Değişiklikler:\n%s",
+              "description":"**%s**\n\n%s",
               "url":"%s",
               "color":16711680,
               "image":{"url":"%s"}
             }]
           }' "$BASLIK" "$OZET" "$LINK" "$RESIM")
 
-          curl -X POST -H "Content-Type: application/json" \
+          curl -s -X POST -H "Content-Type: application/json" \
           -d "$PAYLOAD" \
           https://discord.com/api/webhooks/1499488095429726227/iL7B7POBmgpLHalVECNxyAUGcv90aX3LOw1gVyGB30kLOk8wHvShxyMPpRqVqRvEY1XR
