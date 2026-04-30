@@ -1,10 +1,7 @@
-name: SCUM Güncelleme Botu
+name: SCUM Açıklamalı Bot
 
 on:
-  # Elle çalıştırmak için
   workflow_dispatch:
-
-  # 30 dakikada bir otomatik kontrol
   schedule:
     - cron: "*/30 * * * *"
 
@@ -13,41 +10,51 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 🔽 SCUM haberlerini çek
-      - name: SCUM haberlerini al
+      - name: Haber çek
         run: |
           curl -s https://store.steampowered.com/feeds/news/app/513710/ > feed.xml
 
-          # Başlığı çek
           BASLIK=$(grep -oP '<title>.*?</title>' feed.xml | sed -n '2p' | sed 's/<[^>]*>//g')
-
-          # Linki çek
           LINK=$(grep -oP '<link>.*?</link>' feed.xml | sed -n '2p' | sed 's/<[^>]*>//g')
 
           echo "$BASLIK" > baslik.txt
           echo "$LINK" > link.txt
 
-      # 🔽 Discord'a mesaj gönder
+      - name: İçerik çek (patch notes)
+        run: |
+          LINK=$(cat link.txt)
+
+          # Sayfanın içeriğini çek
+          curl -s "$LINK" > page.html
+
+          # Liste maddelerini çek (ilk 8 madde)
+          OZET=$(grep -oP '<li>.*?</li>' page.html | sed 's/<[^>]*>//g' | head -n 8)
+
+          # Eğer boşsa fallback
+          if [ -z "$OZET" ]; then
+            OZET="Detaylar için linke tıkla."
+          fi
+
+          echo "$OZET" > ozet.txt
+
       - name: Discord'a gönder
         run: |
           BASLIK=$(cat baslik.txt)
           LINK=$(cat link.txt)
+          OZET=$(cat ozet.txt)
 
-          # 🖼️ SCUM görseli
           RESIM="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
 
-          # 📦 Mesaj içeriği (embed)
           PAYLOAD=$(printf '{
             "embeds":[{
               "title":"📢 SCUM GÜNCELLEME",
-              "description":"%s",
+              "description":"**%s**\n\n🔧 Gelen Değişiklikler:\n%s",
               "url":"%s",
               "color":16711680,
               "image":{"url":"%s"}
             }]
-          }' "$BASLIK" "$LINK" "$RESIM")
+          }' "$BASLIK" "$OZET" "$LINK" "$RESIM")
 
-          # 🚀 Discord webhook ile gönder
           curl -X POST -H "Content-Type: application/json" \
           -d "$PAYLOAD" \
           https://discord.com/api/webhooks/1499488095429726227/iL7B7POBmgpLHalVECNxyAUGcv90aX3LOw1gVyGB30kLOk8wHvShxyMPpRqVqRvEY1XR
