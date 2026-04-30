@@ -1,15 +1,15 @@
-name: SCUM Update Bot
+name: SCUM Bot Test
 
 on:
   workflow_dispatch:
 
 jobs:
-  check:
+  test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Send test message
+      - name: Send Discord Message
         run: |
           curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\":\"✅ BOT ÇALIŞIYOR\"}" \
-    https://discord.com/api/webhooks/1499484638878498996/uMs11agj7w4f-ztTFUKFZ5Tr3DJ6d404ljOoNram4wG-GJtl8610TJJKlEuX49l6wQ-v
+          -d '{"content":"✅ BOT ÇALIŞIYOR"}' \
+          https://discord.com/api/webhooks/1499488095429726227/iL7B7POBmgpLHalVECNxyAUGcv90aX3LOw1gVyGB30kLOk8wHvShxyMPpRqVqRvEY1XR
