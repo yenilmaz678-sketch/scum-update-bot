@@ -1,13 +1,57 @@
-name: SCUM Bot Test
+name: SCUM Update PRO Bot
 
 on:
+  schedule:
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 jobs:
-  test:
+  check:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Send Discord Message
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Get SCUM news
         run: |
-          curl -X POST -H "Content-Type: application/json" -d '{"content":"✅ BOT ÇALIŞIYOR"}' https://discord.com/api/webhooks/1499488095429726227/iL7B7POBmgpLHalVECNxyAUGcv90aX3LOw1gVyGB30kLOk8wHvShxyMPpRqVqRvEY1XR
+          curl -s https://store.steampowered.com/feeds/news/app/513710/ > feed.xml
+          TITLE=$(grep -oP '<title>.*?</title>' feed.xml | sed -n '2p' | sed 's/<[^>]*>//g')
+          echo "$TITLE" > latest.txt
+
+      - name: Check old update
+        id: check
+        run: |
+          if [ -f last.txt ]; then
+            OLD=$(cat last.txt)
+          else
+            OLD=""
+          fi
+
+          NEW=$(cat latest.txt)
+
+          if [ "$OLD" = "$NEW" ]; then
+            echo "no_change=true" >> $GITHUB_ENV
+          else
+            echo "no_change=false" >> $GITHUB_ENV
+          fi
+
+      - name: Send to Discord
+        if: env.no_change == 'false'
+        run: |
+          TITLE=$(cat latest.txt)
+          curl -X POST -H "Content-Type: application/json" \
+          -d "{\"content\":\"📢 SCUM Update:\\n$TITLE\"}" \
+          https://discord.com/api/webhooks/1499488095429726227/iL7B7POBmgpLHalVECNxyAUGcv90aX3LOw1gVyGB30kLOk8wHvShxyMPpRqVqRvEY1XR
+
+      - name: Save latest
+        run: |
+          mv latest.txt last.txt
+
+      - name: Commit changes
+        run: |
+          git config user.name "bot"
+          git config user.email "bot@github.com"
+          git add last.txt
+          git commit -m "update last news" || echo "no changes"
+          git push
