@@ -1,4 +1,4 @@
-name: SCUM Efsane Bot
+name: SCUM Ultimate Fix Bot
 
 on:
   workflow_dispatch:
@@ -10,61 +10,63 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Repo çek
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Haber al
         run: |
-          curl -s https://store.steampowered.com/feeds/news/app/513710/ > feed.xml
+          curl -s https://store.steampowered.com/feeds/news/app/513710/ > feed.xml || true
 
-          BASLIK=$(grep -oP '<title>.*?</title>' feed.xml | sed -n '2p' | sed 's/<[^>]*>//g')
-          LINK=$(grep -oP '<link>.*?</link>' feed.xml | sed -n '2p' | sed 's/<[^>]*>//g')
+          BASLIK=$(grep -oP '<title>.*?</title>' feed.xml 2>/dev/null | sed -n '2p' | sed 's/<[^>]*>//g')
+          LINK=$(grep -oP '<link>.*?</link>' feed.xml 2>/dev/null | sed -n '2p' | sed 's/<[^>]*>//g')
+
+          [ -z "$BASLIK" ] && BASLIK="Yeni SCUM güncellemesi"
+          [ -z "$LINK" ] && LINK="https://store.steampowered.com/app/513710"
 
           echo "$BASLIK" > baslik.txt
           echo "$LINK" > link.txt
 
-      - name: Önceki kontrol (spam engel)
+      - name: Spam kontrol
         run: |
-          if [ -f last.txt ]; then
-            ESKI=$(cat last.txt)
-          else
-            ESKI=""
-          fi
-
           YENI=$(cat baslik.txt)
+          ESKI=$(cat last.txt 2>/dev/null || echo "")
 
-          if [ "$ESKI" = "$YENI" ]; then
+          if [ "$YENI" = "$ESKI" ]; then
             echo "SEND=false" >> $GITHUB_ENV
           else
             echo "SEND=true" >> $GITHUB_ENV
           fi
 
-      - name: İçerik çek
+      - name: İçerik çek (hata korumalı)
         if: env.SEND == 'true'
         run: |
           LINK=$(cat link.txt)
-          curl -s "$LINK" > page.html
+          curl -s "$LINK" > page.html || true
 
-          grep -oP '<li>.*?</li>' page.html | sed 's/<[^>]*>//g' > raw.txt
+          grep -oP '<li>.*?</li>' page.html 2>/dev/null | sed 's/<[^>]*>//g' > raw.txt || true
 
-      - name: Akıllı özet oluştur
+          # boşsa fallback
+          if [ ! -s raw.txt ]; then
+            echo "Yeni güncelleme yayınlandı." > raw.txt
+          fi
+
+      - name: Akıllı özet
         if: env.SEND == 'true'
         run: |
-          BUG=$(grep -i "fix" raw.txt | head -n 3)
-          PERF=$(grep -i "performance" raw.txt | head -n 2)
-          CONTENT=$(grep -i "added\|new" raw.txt | head -n 3)
+          BUG=$(grep -i "fix" raw.txt 2>/dev/null | head -n 3)
+          PERF=$(grep -i "performance" raw.txt 2>/dev/null | head -n 2)
+          CONTENT=$(grep -iE "added|new" raw.txt 2>/dev/null | head -n 3)
 
           echo "🔧 ÖZET:" > ozet.txt
 
           if [ ! -z "$CONTENT" ]; then
             echo "" >> ozet.txt
-            echo "🆕 Yeni İçerikler:" >> ozet.txt
+            echo "🆕 Yeni:" >> ozet.txt
             echo "$CONTENT" | sed 's/^/• /' >> ozet.txt
           fi
 
           if [ ! -z "$BUG" ]; then
             echo "" >> ozet.txt
-            echo "🐛 Düzeltmeler:" >> ozet.txt
+            echo "🐛 Fix:" >> ozet.txt
             echo "$BUG" | sed 's/^/• /' >> ozet.txt
           fi
 
@@ -83,22 +85,15 @@ jobs:
 
           RESIM="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
 
-          if echo "$BASLIK" | grep -Eiq "update|patch|v0"; then
-            PING="@everyone"
-          else
-            PING=""
-          fi
-
           PAYLOAD=$(printf '{
-            "content":"%s",
             "embeds":[{
-              "title":"📢 SCUM GÜNCELLEME",
+              "title":"📢 SCUM UPDATE",
               "description":"**%s**\n\n%s",
               "url":"%s",
               "color":16711680,
               "image":{"url":"%s"}
             }]
-          }' "$PING" "$BASLIK" "$OZET" "$LINK" "$RESIM")
+          }' "$BASLIK" "$OZET" "$LINK" "$RESIM")
 
           curl -s -X POST -H "Content-Type: application/json" \
           -d "$PAYLOAD" \
@@ -107,13 +102,13 @@ jobs:
       - name: Kaydet
         if: env.SEND == 'true'
         run: |
-          mv baslik.txt last.txt
+          cp baslik.txt last.txt
 
-      - name: Commit
+      - name: Push
         if: env.SEND == 'true'
         run: |
           git config user.name "bot"
-          git config user.email "bot@github.com"
+          git config user.email "bot@bot.com"
           git add last.txt
-          git commit -m "update" || echo "no change"
-          git push
+          git commit -m "update" || true
+          git push || true
