@@ -1,41 +1,53 @@
-name: SCUM Ultimate Bot
+name: SCUM Güncelleme Botu
 
 on:
-  schedule:
-    - cron: "*/30 * * * *"
+  # Elle çalıştırmak için
   workflow_dispatch:
 
+  # 30 dakikada bir otomatik kontrol
+  schedule:
+    - cron: "*/30 * * * *"
+
 jobs:
-  run:
+  kontrol:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Fetch Steam News
+      # 🔽 SCUM haberlerini çek
+      - name: SCUM haberlerini al
         run: |
-          curl -s "https://store.steampowered.com/feeds/news/app/513710/" -o feed.xml
-          TITLE=$(grep -oP '<title>.*?</title>' feed.xml | sed -n '2p' | sed 's/<[^>]*>//g')
+          curl -s https://store.steampowered.com/feeds/news/app/513710/ > feed.xml
+
+          # Başlığı çek
+          BASLIK=$(grep -oP '<title>.*?</title>' feed.xml | sed -n '2p' | sed 's/<[^>]*>//g')
+
+          # Linki çek
           LINK=$(grep -oP '<link>.*?</link>' feed.xml | sed -n '2p' | sed 's/<[^>]*>//g')
 
-          echo "$TITLE" > latest.txt
+          echo "$BASLIK" > baslik.txt
           echo "$LINK" > link.txt
 
-      - name: Send Discord (Image + Embed)
+      # 🔽 Discord'a mesaj gönder
+      - name: Discord'a gönder
         run: |
-          TITLE=$(cat latest.txt)
+          BASLIK=$(cat baslik.txt)
           LINK=$(cat link.txt)
 
-          IMAGE="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
+          # 🖼️ SCUM görseli
+          RESIM="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
 
+          # 📦 Mesaj içeriği (embed)
           PAYLOAD=$(printf '{
             "embeds":[{
-              "title":"📢 SCUM UPDATE",
+              "title":"📢 SCUM GÜNCELLEME",
               "description":"%s",
               "url":"%s",
               "color":16711680,
               "image":{"url":"%s"}
             }]
-          }' "$TITLE" "$LINK" "$IMAGE")
+          }' "$BASLIK" "$LINK" "$RESIM")
 
-          curl -s -X POST -H "Content-Type: application/json" \
+          # 🚀 Discord webhook ile gönder
+          curl -X POST -H "Content-Type: application/json" \
           -d "$PAYLOAD" \
           https://discord.com/api/webhooks/1499488095429726227/iL7B7POBmgpLHalVECNxyAUGcv90aX3LOw1gVyGB30kLOk8wHvShxyMPpRqVqRvEY1XR
