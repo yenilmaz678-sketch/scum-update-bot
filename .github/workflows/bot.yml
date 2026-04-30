@@ -1,4 +1,4 @@
-name: SCUM Update PRO Bot
+name: SCUM Ultimate Bot
 
 on:
   schedule:
@@ -6,49 +6,88 @@ on:
   workflow_dispatch:
 
 jobs:
-  check:
+  run:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Get SCUM news
+      - name: Fetch Steam News
         run: |
-          curl -s https://store.steampowered.com/feeds/news/app/513710/ > feed.xml
+          curl -s "https://store.steampowered.com/feeds/news/app/513710/" -o feed.xml
           TITLE=$(grep -oP '<title>.*?</title>' feed.xml | sed -n '2p' | sed 's/<[^>]*>//g')
+          LINK=$(grep -oP '<link>.*?</link>' feed.xml | sed -n '2p' | sed 's/<[^>]*>//g')
           echo "$TITLE" > latest.txt
+          echo "$LINK" > link.txt
 
-      - name: Check old update
-        id: check
+      - name: Detect Change
+        id: diff
         run: |
           if [ -f last.txt ]; then
             OLD=$(cat last.txt)
           else
             OLD=""
           fi
-
           NEW=$(cat latest.txt)
 
           if [ "$OLD" = "$NEW" ]; then
-            echo "no_change=true" >> $GITHUB_ENV
+            echo "send=false" >> $GITHUB_OUTPUT
           else
-            echo "no_change=false" >> $GITHUB_ENV
+            echo "send=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Send to Discord
-        if: env.no_change == 'false'
+      - name: Decide Ping (only major updates)
+        if: steps.diff.outputs.send == 'true'
+        id: ping
         run: |
           TITLE=$(cat latest.txt)
-          curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\":\"📢 SCUM Update:\\n$TITLE\"}" \
+
+          # Büyük update tespiti (Update/Patch/Version gibi kelimeler)
+          if echo "$TITLE" | grep -Eiq "update|patch|version|v[0-9]"; then
+            echo "ping=@everyone" >> $GITHUB_OUTPUT
+          else
+            echo "ping=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Simple TR translate (title)
+        if: steps.diff.outputs.send == 'true'
+        id: tr
+        run: |
+          TITLE=$(cat latest.txt)
+
+          # Basit yerel çeviri (en kritik kelimeler)
+          TR="$TITLE"
+          TR=$(echo "$TR" | sed 's/Update/Güncelleme/gI')
+          TR=$(echo "$TR" | sed 's/Patch/Yama/gI')
+          TR=$(echo "$TR" | sed 's/Hotfix/Düzeltme/gI')
+          TR=$(echo "$TR" | sed 's/News/Haber/gI')
+          TR=$(echo "$TR" | sed 's/Version/Sürüm/gI')
+
+          echo "$TR" > tr.txt
+
+      - name: Send Discord (Embed)
+        if: steps.diff.outputs.send == 'true'
+        run: |
+          TITLE=$(cat latest.txt)
+          TR=$(cat tr.txt)
+          LINK=$(cat link.txt)
+          PING="${{ steps.ping.outputs.ping }}"
+
+          # JSON'u tek satırda, kaçış hatası olmadan gönderiyoruz
+          PAYLOAD=$(printf '{"content":"%s","embeds":[{"title":"📢 SCUM UPDATE","description":"**%s**\\n\\n_%s_","url":"%s","color":16711680}]}' "$PING" "$TITLE" "$TR" "$LINK")
+
+          curl -s -X POST -H "Content-Type: application/json" \
+          -d "$PAYLOAD" \
           https://discord.com/api/webhooks/1499488095429726227/iL7B7POBmgpLHalVECNxyAUGcv90aX3LOw1gVyGB30kLOk8wHvShxyMPpRqVqRvEY1XR
 
-      - name: Save latest
+      - name: Save Latest
+        if: steps.diff.outputs.send == 'true'
         run: |
           mv latest.txt last.txt
 
-      - name: Commit changes
+      - name: Commit State
+        if: steps.diff.outputs.send == 'true'
         run: |
           git config user.name "bot"
           git config user.email "bot@github.com"
