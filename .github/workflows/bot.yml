@@ -10,6 +10,4 @@ jobs:
     steps:
       - name: Send Discord Message
         run: |
-          curl -X POST -H "Content-Type: application/json" \
-          -d '{"content":"✅ BOT ÇALIŞIYOR"}' \
-          https://discord.com/api/webhooks/1499488095429726227/iL7B7POBmgpLHalVECNxyAUGcv90aX3LOw1gVyGB30kLOk8wHvShxyMPpRqVqRvEY1XR
+          curl -X POST -H "Content-Type: application/json" -d '{"content":"✅ BOT ÇALIŞIYOR"}' https://discord.com/api/webhooks/1499488095429726227/iL7B7POBmgpLHalVECNxyAUGcv90aX3LOw1gVyGB30kLOk8wHvShxyMPpRqVqRvEY1XR
