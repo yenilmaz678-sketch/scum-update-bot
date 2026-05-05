@@ -14,18 +14,22 @@ jobs:
 
       - name: Haberleri çek
         run: |
-          curl -s https://store.steampowered.com/feeds/news/app/513710/ > feed.xml || true
+          set +e
 
-          grep -oP '<title>.*?</title>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > titles.txt
-          grep -oP '<link>.*?</link>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > links.txt
+          curl -s https://store.steampowered.com/feeds/news/app/513710/ > feed.xml
 
-          head -n 1 titles.txt > baslik.txt
-          head -n 1 links.txt > link.txt
+          grep -o '<title>.*</title>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > titles.txt || true
+          grep -o '<link>.*</link>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > links.txt || true
+
+          head -n 1 titles.txt > baslik.txt || echo "SCUM Update" > baslik.txt
+          head -n 1 links.txt > link.txt || echo "https://store.steampowered.com/app/513710" > link.txt
 
       - name: Spam kontrol
         run: |
+          set +e
+
           YENI=$(cat baslik.txt)
-          ESKI=$(cat last.txt 2>/dev/null || echo "")
+          ESKI=$(cat last.txt 2>/dev/null)
 
           if [ "$YENI" = "$ESKI" ]; then
             echo "SEND=false" >> $GITHUB_ENV
@@ -36,52 +40,46 @@ jobs:
       - name: Liste hazırla
         if: env.SEND == 'true'
         run: |
-          paste titles.txt links.txt | awk '{print "• **" $1 "**\n" $2 "\n"}' > liste.txt
+          set +e
 
-      - name: Büyük update kontrol
-        if: env.SEND == 'true'
-        run: |
-          BASLIK=$(cat baslik.txt)
+          paste titles.txt links.txt > tmp.txt || true
 
-          if echo "$BASLIK" | grep -iqE "patch|update|hotfix|major"; then
-            echo "BUYUK=true" >> $GITHUB_ENV
-          else
-            echo "BUYUK=false" >> $GITHUB_ENV
-          fi
+          > liste.txt
+          while read line; do
+            TITLE=$(echo $line | cut -d ' ' -f1)
+            LINK=$(echo $line | cut -d ' ' -f2-)
+            echo "• $TITLE" >> liste.txt
+            echo "$LINK" >> liste.txt
+            echo "" >> liste.txt
+          done < tmp.txt
 
       - name: Discord gönder
         if: env.SEND == 'true'
         run: |
+          set +e
+
           BASLIK=$(cat baslik.txt)
           LINK=$(cat link.txt)
           LISTE=$(cat liste.txt)
-
-          if [ "$BUYUK" = "true" ]; then
-            RENK=16711680
-            BASLIK2="🔥 BÜYÜK UPDATE!"
-          else
-            RENK=65280
-            BASLIK2="🟢 Küçük Güncelleme"
-          fi
 
           RESIM="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
 
           curl -X POST -H "Content-Type: application/json" \
           -d "{
-            \"embeds\":[{
-              \"title\":\"$BASLIK2\",
-              \"description\":\"📢 **$BASLIK**\n\n📜 Son Güncellemeler:\n\n$LISTE\n🔗 Detay: $LINK\",
-              \"url\":\"$LINK\",
-              \"color\":$RENK,
-              \"image\":{\"url\":\"$RESIM\"}
+            \"embeds\": [{
+              \"title\": \"SCUM UPDATE\",
+              \"description\": \"$BASLIK\n\n$LISTE\nDetay: $LINK\",
+              \"url\": \"$LINK\",
+              \"color\": 16711680,
+              \"image\": {\"url\": \"$RESIM\"}
             }]
           }" \
-          $DISCORD_WEBHOOK
-
+          $DISCORD_WEBHOOK || true
+          https://discord.com/api/webhooks/1501336581766905967/RuuRcbC0UaP72dD2qzfgftno3Y-Jw3ksc2TmIYF5sztqkNszGh8V-wEhImjDwR0z6Evl
       - name: Kaydet
         if: env.SEND == 'true'
         run: |
-          cp baslik.txt last.txt
+          cp baslik.txt last.txt || true
 
       - name: Push
         if: env.SEND == 'true'
