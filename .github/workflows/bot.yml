@@ -1,78 +1,104 @@
-- name: Discord tek tek gönder (TR TEMİZ)
-  if: env.SEND == 'true'
-  run: |
-    RESIM="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
-    THUMB="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/capsule_184x69.jpg"
+name: SCUM TR BOT
 
-    for i in {1..5}
-    do
-      RAW_DATE=$(sed -n "${i}p" dates.txt)
-      TITLE=$(sed -n "${i}p" titles.txt)
-      LINK=$(sed -n "${i}p" links.txt)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/10 * * * *"
 
-      [ -z "$TITLE" ] && continue
+jobs:
+  run:
+    runs-on: ubuntu-latest
 
-      # Türkçe tarih
-      GUN=$(date -d "$RAW_DATE" +"%d")
-      AY_EN=$(date -d "$RAW_DATE" +"%m")
-      YIL=$(date -d "$RAW_DATE" +"%Y")
+    steps:
+      - uses: actions/checkout@v4
 
-      case $AY_EN in
-        01) AY="Ocak";;
-        02) AY="Şubat";;
-        03) AY="Mart";;
-        04) AY="Nisan";;
-        05) AY="Mayıs";;
-        06) AY="Haziran";;
-        07) AY="Temmuz";;
-        08) AY="Ağustos";;
-        09) AY="Eylül";;
-        10) AY="Ekim";;
-        11) AY="Kasım";;
-        12) AY="Aralık";;
-      esac
+      - name: Haberleri çek
+        run: |
+          curl -s https://store.steampowered.com/feeds/news/app/513710/ > feed.xml
 
-      DATE_TR="$GUN $AY $YIL"
+          grep -o '<title>.*</title>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > titles.txt
+          grep -o '<link>.*</link>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > links.txt
+          grep -o '<pubDate>.*</pubDate>' feed.xml | head -n 5 | sed 's/<[^>]*>//g' > dates.txt
 
-      # İngilizce başlığı Türkçeleştir
-      TITLE_TR=$(echo "$TITLE" \
-        | sed 's/officially live/yayınlandı/i' \
-        | sed 's/update/güncelleme/i' \
-        | sed 's/patch/yama/i' \
-        | sed 's/hotfix/düzeltme/i')
+          head -n 1 titles.txt > baslik.txt
 
-      # Açıklama
-      if echo "$TITLE" | grep -iq "hotfix"; then
-        ACIKLAMA="Küçük hatalar düzeltildi ve oyun daha stabil hale getirildi."
-      elif echo "$TITLE" | grep -iqE "update|patch"; then
-        ACIKLAMA="Yeni içerikler ve önemli sistem güncellemeleri eklendi."
-      else
-        ACIKLAMA="Yeni bir duyuru veya içerik paylaşımı yapıldı."
-      fi
+      - name: Spam kontrol
+        run: |
+          YENI=$(cat baslik.txt)
+          ESKI=$(cat last.txt 2>/dev/null || echo "")
 
-      # Renk
-      if echo "$TITLE" | grep -iqE "update|patch"; then
-        RENK=16711680
-        DURUM="🔥 BÜYÜK GÜNCELLEME"
-      else
-        RENK=65280
-        DURUM="🟢 Güncelleme"
-      fi
+          if [ "$YENI" = "$ESKI" ]; then
+            echo "SEND=false" >> $GITHUB_ENV
+          else
+            echo "SEND=true" >> $GITHUB_ENV
+          fi
 
-      echo "{
-        \"embeds\": [{
-          \"title\": \"$DURUM\",
-          \"description\": \"📅 $DATE_TR\n\n🆕 $TITLE_TR\n\n🧠 $ACIKLAMA\",
-          \"url\": \"$LINK\",
-          \"color\": $RENK,
-          \"thumbnail\": {\"url\": \"$THUMB\"},
-          \"image\": {\"url\": \"$RESIM\"}
-        }]
-      }" > payload.json
+      - name: Discord gönder
+        if: env.SEND == 'true'
+        run: |
+          RESIM="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
+          THUMB="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/capsule_184x69.jpg"
 
-      curl -X POST -H "Content-Type: application/json" \
-      --data @payload.json \
-     https://discord.com/api/webhooks/1501336581766905967/RuuRcbC0UaP72dD2qzfgftno3Y-Jw3ksc2TmIYF5sztqkNszGh8V-wEhImjDwR0z6Evl
+          for i in {1..5}
+          do
+            RAW_DATE=$(sed -n "${i}p" dates.txt)
+            TITLE=$(sed -n "${i}p" titles.txt)
+            LINK=$(sed -n "${i}p" links.txt)
 
-      sleep 2
-    done
+            [ -z "$TITLE" ] && continue
+
+            GUN=$(date -d "$RAW_DATE" +"%d")
+            AY_EN=$(date -d "$RAW_DATE" +"%m")
+            YIL=$(date -d "$RAW_DATE" +"%Y")
+
+            case $AY_EN in
+              01) AY="Ocak";;
+              02) AY="Şubat";;
+              03) AY="Mart";;
+              04) AY="Nisan";;
+              05) AY="Mayıs";;
+              06) AY="Haziran";;
+              07) AY="Temmuz";;
+              08) AY="Ağustos";;
+              09) AY="Eylül";;
+              10) AY="Ekim";;
+              11) AY="Kasım";;
+              12) AY="Aralık";;
+            esac
+
+            DATE_TR="$GUN $AY $YIL"
+
+            TITLE_TR=$(echo "$TITLE" | sed 's/officially live/yayınlandı/i')
+
+            if echo "$TITLE" | grep -iqE "update|patch"; then
+              RENK=16711680
+              DURUM="🔥 BÜYÜK GÜNCELLEME"
+              ACIKLAMA="Yeni içerikler ve sistem güncellemeleri eklendi."
+            else
+              RENK=65280
+              DURUM="🟢 Güncelleme"
+              ACIKLAMA="Hatalar düzeltildi ve performans iyileştirildi."
+            fi
+
+            echo "{
+              \"embeds\": [{
+                \"title\": \"$DURUM\",
+                \"description\": \"📅 $DATE_TR\n\n🆕 $TITLE_TR\n\n🧠 $ACIKLAMA\",
+                \"url\": \"$LINK\",
+                \"color\": $RENK,
+                \"thumbnail\": {\"url\": \"$THUMB\"},
+                \"image\": {\"url\": \"$RESIM\"}
+              }]
+            }" > payload.json
+
+            curl -X POST -H "Content-Type: application/json" \
+            --data @payload.json \
+            https://discord.com/api/webhooks/1501336581766905967/RuuRcbC0UaP72dD2qzfgftno3Y-Jw3ksc2TmIYF5sztqkNszGh8V-wEhImjDwR0z6Evl
+
+            sleep 2
+          done
+
+      - name: Kaydet
+        if: env.SEND == 'true'
+        run: |
+          cp baslik.txt last.txt
