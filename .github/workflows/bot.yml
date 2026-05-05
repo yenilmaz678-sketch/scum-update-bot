@@ -1,4 +1,4 @@
-name: SCUM FULL PRO BOT
+name: SCUM FULL BOT EVERYONE
 
 on:
   workflow_dispatch:
@@ -25,7 +25,6 @@ jobs:
       - name: Update gönder
         run: |
           WEBHOOK="https://discord.com/api/webhooks/BURAYA_WEBHOOK_LINKIN"
-          ROLE_ID="BURAYA_ROLE_ID"
 
           RESIM="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
           THUMB="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/capsule_184x69.jpg"
@@ -37,11 +36,6 @@ jobs:
             RAW_DATE=$(sed -n "${i}p" dates.txt)
 
             [ -z "$TITLE" ] && continue
-
-            # SADECE GERÇEK UPDATE
-            if ! echo "$TITLE" | grep -iqE "update|patch|hotfix|wipe"; then
-              continue
-            fi
 
             # Daha önce gönderildi mi
             if grep -Fxq "$TITLE" sent.txt; then
@@ -75,28 +69,30 @@ jobs:
               | sed 's/update/güncelleme/i' \
               | sed 's/patch/yama/i' \
               | sed 's/hotfix/düzeltme/i' \
-              | sed 's/wipe/sıfırlama/i')
+              | sed 's/community/topluluk/i' \
+              | sed 's/showcase/gösterim/i')
 
-            # WIPE kontrol
+            # Tür belirleme
             if echo "$TITLE" | grep -iq "wipe"; then
               DURUM="🚨 WIPE GELDİ!"
               RENK=16711680
               ACIKLAMA="Sunucu sıfırlandı! Herkes sıfırdan başlıyor."
-              PING="<@&$ROLE_ID>"
             elif echo "$TITLE" | grep -iq "hotfix"; then
               DURUM="🛠️ DÜZELTME"
               RENK=65280
               ACIKLAMA="Hatalar düzeltildi ve stabilite artırıldı."
-              PING=""
-            else
+            elif echo "$TITLE" | grep -iqE "update|patch"; then
               DURUM="🔥 BÜYÜK GÜNCELLEME"
               RENK=16753920
-              ACIKLAMA="Yeni içerikler ve büyük değişiklikler eklendi."
-              PING="<@&$ROLE_ID>"
+              ACIKLAMA="Yeni içerikler ve önemli değişiklikler eklendi."
+            else
+              DURUM="📢 DUYURU"
+              RENK=3447003
+              ACIKLAMA="Topluluk paylaşımı veya bilgilendirme mesajı."
             fi
 
             echo "{
-              \"content\": \"$PING\",
+              \"content\": \"@everyone\",
               \"embeds\": [{
                 \"title\": \"$DURUM\",
                 \"description\": \"📅 $DATE_TR\n\n🆕 $TITLE_TR\n\n🧠 $ACIKLAMA\",
