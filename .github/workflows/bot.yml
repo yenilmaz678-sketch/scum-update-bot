@@ -3,7 +3,7 @@ name: SCUM PRO UPDATE BOT
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/10 * * * *"  # 10 dakikada bir kontrol (daha hızlı)
+    - cron: "*/10 * * * *"
 
 jobs:
   run:
@@ -43,7 +43,7 @@ jobs:
         run: |
           BASLIK=$(cat baslik.txt)
 
-          if echo "$BASLIK" | grep -iE "patch|update|hotfix|major"; then
+          if echo "$BASLIK" | grep -iqE "patch|update|hotfix|major"; then
             echo "BUYUK=true" >> $GITHUB_ENV
           else
             echo "BUYUK=false" >> $GITHUB_ENV
@@ -57,28 +57,26 @@ jobs:
           LISTE=$(cat liste.txt)
 
           if [ "$BUYUK" = "true" ]; then
-            RENK=16711680   # kırmızı (büyük update)
+            RENK=16711680
             BASLIK2="🔥 BÜYÜK UPDATE!"
           else
-            RENK=65280      # yeşil (küçük update)
+            RENK=65280
             BASLIK2="🟢 Küçük Güncelleme"
           fi
 
           RESIM="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
 
-          PAYLOAD=$(printf '{
-            "embeds":[{
-              "title":"%s",
-              "description":"📢 **%s**\n\n📜 Son Güncellemeler:\n\n%s\n🔗 Detay: %s",
-              "url":"%s",
-              "color":%s,
-              "image":{"url":"%s"}
+          curl -X POST -H "Content-Type: application/json" \
+          -d "{
+            \"embeds\":[{
+              \"title\":\"$BASLIK2\",
+              \"description\":\"📢 **$BASLIK**\n\n📜 Son Güncellemeler:\n\n$LISTE\n🔗 Detay: $LINK\",
+              \"url\":\"$LINK\",
+              \"color\":$RENK,
+              \"image\":{\"url\":\"$RESIM\"}
             }]
-          }' "$BASLIK2" "$BASLIK" "$LISTE" "$LINK" "$LINK" "$RENK" "$RESIM")
-
-          curl -s -X POST -H "Content-Type: application/json" \
-          -d "$PAYLOAD" \
-         https://discord.com/api/webhooks/1501336581766905967/RuuRcbC0UaP72dD2qzfgftno3Y-Jw3ksc2TmIYF5sztqkNszGh8V-wEhImjDwR0z6Evl
+          }" \
+          $DISCORD_WEBHOOK
 
       - name: Kaydet
         if: env.SEND == 'true'
