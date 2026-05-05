@@ -1,4 +1,4 @@
-name: SCUM CLEAN UPDATE BOT
+name: SCUM PRO EMBED BOT
 
 on:
   workflow_dispatch:
@@ -34,25 +34,27 @@ jobs:
             echo "SEND=true" >> $GITHUB_ENV
           fi
 
-      - name: Liste hazırla (TEMİZ)
+      - name: Liste hazırla (PRO)
         if: env.SEND == 'true'
         run: |
           > liste.txt
 
           for i in {1..5}
           do
-            DATE=$(sed -n "${i}p" dates.txt)
+            RAW_DATE=$(sed -n "${i}p" dates.txt)
             TITLE=$(sed -n "${i}p" titles.txt)
             LINK=$(sed -n "${i}p" links.txt)
 
-            echo "━━━━━━━━━━━━━━━━━━" >> liste.txt
-            echo "📅 $DATE" >> liste.txt
+            DATE=$(date -d "$RAW_DATE" +"%d %b %Y" 2>/dev/null || echo "$RAW_DATE")
+
+            echo "📅 **$DATE**" >> liste.txt
             echo "🆕 $TITLE" >> liste.txt
             echo "🔗 $LINK" >> liste.txt
+            echo "━━━━━━━━━━━━━━" >> liste.txt
             echo "" >> liste.txt
           done
 
-      - name: Discord (RESİMLİ) gönder
+      - name: Discord PRO gönder
         if: env.SEND == 'true'
         run: |
           BASLIK=$(cat baslik.txt)
@@ -60,13 +62,26 @@ jobs:
           LISTE=$(cat liste.txt)
 
           RESIM="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
+          THUMB="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/capsule_184x69.jpg"
+
+          # Büyük update kontrol
+          if echo "$BASLIK" | grep -iqE "update|patch"; then
+            RENK=16711680
+            DURUM="🔥 BÜYÜK GÜNCELLEME"
+          else
+            RENK=65280
+            DURUM="🟢 Küçük Güncelleme"
+          fi
 
           echo "{
             \"embeds\": [{
-              \"title\": \"📢 SCUM UPDATE\",
-              \"description\": \"$LISTE\n🔗 En Güncel: $LINK\",
-              \"color\": 16711680,
-              \"image\": {\"url\": \"$RESIM\"}
+              \"title\": \"$DURUM\",
+              \"description\": \"$LISTE\",
+              \"url\": \"$LINK\",
+              \"color\": $RENK,
+              \"thumbnail\": {\"url\": \"$THUMB\"},
+              \"image\": {\"url\": \"$RESIM\"},
+              \"footer\": {\"text\": \"SCUM Sunucu Botu • Otomatik Güncelleme Sistemi\"}
             }]
           }" > payload.json
 
