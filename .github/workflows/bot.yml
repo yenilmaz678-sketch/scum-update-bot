@@ -54,10 +54,10 @@ jobs:
           LINK=$(cat link.txt)
           LISTE=$(cat liste.txt)
 
+          JSON="{\"content\":\"📢 SCUM UPDATE\n\n$BASLIK\n\n$LISTE\nDetay: $LINK\"}"
+
           curl -X POST -H "Content-Type: application/json" \
-          -d "{
-            \"content\": \"📢 SCUM UPDATE\n\n$BASLIK\n\n$LISTE\nDetay: $LINK\"
-          }" \
+          -d "$JSON" \
          https://discord.com/api/webhooks/1501336581766905967/RuuRcbC0UaP72dD2qzfgftno3Y-Jw3ksc2TmIYF5sztqkNszGh8V-wEhImjDwR0z6Evl
 
       - name: Kaydet
