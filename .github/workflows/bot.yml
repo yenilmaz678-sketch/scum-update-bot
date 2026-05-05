@@ -1,14 +1,75 @@
-name: test
+name: SCUM UPDATE BOT
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "*/10 * * * *"
 
 jobs:
-  test:
+  run:
     runs-on: ubuntu-latest
+
     steps:
-      - name: test mesajı gönder
+      - uses: actions/checkout@v4
+
+      - name: Haberleri çek
         run: |
+          curl -s https://store.steampowered.com/feeds/news/app/513710/ > feed.xml
+
+          grep -o '<title>.*</title>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > titles.txt
+          grep -o '<link>.*</link>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > links.txt
+
+          head -n 1 titles.txt > baslik.txt
+          head -n 1 links.txt > link.txt
+
+      - name: Spam kontrol
+        run: |
+          YENI=$(cat baslik.txt)
+          ESKI=$(cat last.txt 2>/dev/null || echo "")
+
+          if [ "$YENI" = "$ESKI" ]; then
+            echo "SEND=false" >> $GITHUB_ENV
+          else
+            echo "SEND=true" >> $GITHUB_ENV
+          fi
+
+      - name: Liste hazırla
+        if: env.SEND == 'true'
+        run: |
+          paste titles.txt links.txt > tmp.txt
+
+          > liste.txt
+          while read line; do
+            TITLE=$(echo $line | cut -d ' ' -f1)
+            LINK=$(echo $line | cut -d ' ' -f2-)
+            echo "• $TITLE" >> liste.txt
+            echo "$LINK" >> liste.txt
+            echo "" >> liste.txt
+          done < tmp.txt
+
+      - name: Discord gönder
+        if: env.SEND == 'true'
+        run: |
+          BASLIK=$(cat baslik.txt)
+          LINK=$(cat link.txt)
+          LISTE=$(cat liste.txt)
+
           curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\":\"BOT ÇALIŞIYOR 🚀\"}" \
-           https://discord.com/api/webhooks/1501336581766905967/RuuRcbC0UaP72dD2qzfgftno3Y-Jw3ksc2TmIYF5sztqkNszGh8V-wEhImjDwR0z6Evl
+          -d "{
+            \"content\": \"📢 SCUM UPDATE\n\n$BASLIK\n\n$LISTE\nDetay: $LINK\"
+          }" \
+         https://discord.com/api/webhooks/1501336581766905967/RuuRcbC0UaP72dD2qzfgftno3Y-Jw3ksc2TmIYF5sztqkNszGh8V-wEhImjDwR0z6Evl
+
+      - name: Kaydet
+        if: env.SEND == 'true'
+        run: |
+          cp baslik.txt last.txt
+
+      - name: Push
+        if: env.SEND == 'true'
+        run: |
+          git config user.name "bot"
+          git config user.email "bot@bot.com"
+          git add last.txt
+          git commit -m "update" || true
+          git push || true
