@@ -1,4 +1,4 @@
-name: SCUM IMAGE UPDATE BOT
+name: SCUM DATE UPDATE BOT
 
 on:
   workflow_dispatch:
@@ -16,8 +16,10 @@ jobs:
         run: |
           curl -s https://store.steampowered.com/feeds/news/app/513710/ > feed.xml
 
+          # title, link ve tarih çek
           grep -o '<title>.*</title>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > titles.txt
           grep -o '<link>.*</link>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > links.txt
+          grep -o '<pubDate>.*</pubDate>' feed.xml | head -n 5 | sed 's/<[^>]*>//g' > dates.txt
 
           head -n 1 titles.txt > baslik.txt
           head -n 1 links.txt > link.txt
@@ -33,15 +35,18 @@ jobs:
             echo "SEND=true" >> $GITHUB_ENV
           fi
 
-      - name: Liste hazırla
+      - name: Liste hazırla (TARİHLİ)
         if: env.SEND == 'true'
         run: |
-          paste titles.txt links.txt > tmp.txt
+          paste dates.txt titles.txt links.txt > tmp.txt
 
           > liste.txt
           while read line; do
-            TITLE=$(echo $line | cut -d ' ' -f1)
-            LINK=$(echo $line | cut -d ' ' -f2-)
+            DATE=$(echo $line | cut -d ' ' -f1-4)
+            TITLE=$(echo $line | cut -d ' ' -f5)
+            LINK=$(echo $line | cut -d ' ' -f6-)
+
+            echo "📅 $DATE" >> liste.txt
             echo "• $TITLE" >> liste.txt
             echo "$LINK" >> liste.txt
             echo "" >> liste.txt
@@ -59,7 +64,7 @@ jobs:
           echo "{
             \"embeds\": [{
               \"title\": \"📢 SCUM UPDATE\",
-              \"description\": \"$BASLIK\n\n$LISTE\nDetay: $LINK\",
+              \"description\": \"$BASLIK\n\n$LISTE\n🔗 Detay: $LINK\",
               \"url\": \"$LINK\",
               \"color\": 16711680,
               \"image\": {\"url\": \"$RESIM\"}
@@ -69,6 +74,7 @@ jobs:
           curl -X POST -H "Content-Type: application/json" \
           --data @payload.json \
           https://discord.com/api/webhooks/1501336581766905967/RuuRcbC0UaP72dD2qzfgftno3Y-Jw3ksc2TmIYF5sztqkNszGh8V-wEhImjDwR0z6Evl
+
       - name: Kaydet
         if: env.SEND == 'true'
         run: |
