@@ -1,4 +1,4 @@
-name: SCUM UPDATE BOT
+name: SCUM IMAGE UPDATE BOT
 
 on:
   workflow_dispatch:
@@ -47,24 +47,28 @@ jobs:
             echo "" >> liste.txt
           done < tmp.txt
 
-      - name: Discord gönder
+      - name: Discord (RESİMLİ) gönder
         if: env.SEND == 'true'
         run: |
           BASLIK=$(cat baslik.txt)
           LINK=$(cat link.txt)
           LISTE=$(cat liste.txt)
 
-          echo "📢 SCUM UPDATE" > mesaj.txt
-          echo "" >> mesaj.txt
-          echo "$BASLIK" >> mesaj.txt
-          echo "" >> mesaj.txt
-          cat liste.txt >> mesaj.txt
-          echo "Detay: $LINK" >> mesaj.txt
+          RESIM="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
+
+          echo "{
+            \"embeds\": [{
+              \"title\": \"📢 SCUM UPDATE\",
+              \"description\": \"$BASLIK\n\n$LISTE\nDetay: $LINK\",
+              \"url\": \"$LINK\",
+              \"color\": 16711680,
+              \"image\": {\"url\": \"$RESIM\"}
+            }]
+          }" > payload.json
 
           curl -X POST -H "Content-Type: application/json" \
-          --data "{\"content\":\"$(cat mesaj.txt | sed ':a;N;$!ba;s/\n/\\n/g')\"}" \
+          --data @payload.json \
           https://discord.com/api/webhooks/1501336581766905967/RuuRcbC0UaP72dD2qzfgftno3Y-Jw3ksc2TmIYF5sztqkNszGh8V-wEhImjDwR0z6Evl
-
       - name: Kaydet
         if: env.SEND == 'true'
         run: |
