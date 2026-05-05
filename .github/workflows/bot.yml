@@ -33,13 +33,13 @@ jobs:
             echo "SEND=true" >> $GITHUB_ENV
           fi
 
-      - name: Discord gönder
+      - name: Discord gönder (SIRALI)
         if: env.SEND == 'true'
         run: |
           RESIM="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
           THUMB="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/capsule_184x69.jpg"
 
-          for i in {1..5}
+          for i in 5 4 3 2 1
           do
             RAW_DATE=$(sed -n "${i}p" dates.txt)
             TITLE=$(sed -n "${i}p" titles.txt)
@@ -47,6 +47,7 @@ jobs:
 
             [ -z "$TITLE" ] && continue
 
+            # Türkçe tarih
             GUN=$(date -d "$RAW_DATE" +"%d")
             AY_EN=$(date -d "$RAW_DATE" +"%m")
             YIL=$(date -d "$RAW_DATE" +"%Y")
@@ -68,16 +69,29 @@ jobs:
 
             DATE_TR="$GUN $AY $YIL"
 
-            TITLE_TR=$(echo "$TITLE" | sed 's/officially live/yayınlandı/i')
+            # Başlık Türkçeleştirme
+            TITLE_TR=$(echo "$TITLE" \
+              | sed 's/officially live/yayınlandı/i' \
+              | sed 's/update/güncelleme/i' \
+              | sed 's/patch/yama/i' \
+              | sed 's/hotfix/düzeltme/i')
 
+            # Açıklama
+            if echo "$TITLE" | grep -iq "hotfix"; then
+              ACIKLAMA="Küçük hatalar düzeltildi ve oyun daha stabil hale getirildi."
+            elif echo "$TITLE" | grep -iqE "update|patch"; then
+              ACIKLAMA="Yeni içerikler ve önemli sistem güncellemeleri eklendi."
+            else
+              ACIKLAMA="Yeni bir duyuru veya içerik paylaşımı yapıldı."
+            fi
+
+            # Renk & durum
             if echo "$TITLE" | grep -iqE "update|patch"; then
               RENK=16711680
               DURUM="🔥 BÜYÜK GÜNCELLEME"
-              ACIKLAMA="Yeni içerikler ve sistem güncellemeleri eklendi."
             else
               RENK=65280
               DURUM="🟢 Güncelleme"
-              ACIKLAMA="Hatalar düzeltildi ve performans iyileştirildi."
             fi
 
             echo "{
@@ -93,7 +107,7 @@ jobs:
 
             curl -X POST -H "Content-Type: application/json" \
             --data @payload.json \
-            https://discord.com/api/webhooks/1501336581766905967/RuuRcbC0UaP72dD2qzfgftno3Y-Jw3ksc2TmIYF5sztqkNszGh8V-wEhImjDwR0z6Evl
+           https://discord.com/api/webhooks/1501336581766905967/RuuRcbC0UaP72dD2qzfgftno3Y-Jw3ksc2TmIYF5sztqkNszGh8V-wEhImjDwR0z6Evl
 
             sleep 2
           done
