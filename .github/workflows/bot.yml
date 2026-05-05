@@ -1,4 +1,4 @@
-name: SCUM MULTI MESSAGE BOT
+name: SCUM TR UPDATE BOT
 
 on:
   workflow_dispatch:
@@ -22,7 +22,7 @@ jobs:
 
           head -n 1 titles.txt > baslik.txt
 
-      - name: Spam kontrol (sadece en yeniyi baz alır)
+      - name: Spam kontrol
         run: |
           YENI=$(cat baslik.txt)
           ESKI=$(cat last.txt 2>/dev/null || echo "")
@@ -33,7 +33,7 @@ jobs:
             echo "SEND=true" >> $GITHUB_ENV
           fi
 
-      - name: Discord tek tek gönder
+      - name: Discord tek tek gönder (TR)
         if: env.SEND == 'true'
         run: |
           RESIM="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
@@ -45,14 +45,43 @@ jobs:
             TITLE=$(sed -n "${i}p" titles.txt)
             LINK=$(sed -n "${i}p" links.txt)
 
-            # boşsa geç
             [ -z "$TITLE" ] && continue
 
-            DATE=$(date -d "$RAW_DATE" +"%d %b %Y" 2>/dev/null || echo "$RAW_DATE")
+            # Türkçe tarih çeviri
+            GUN=$(date -d "$RAW_DATE" +"%d")
+            AY_EN=$(date -d "$RAW_DATE" +"%m")
+            YIL=$(date -d "$RAW_DATE" +"%Y")
 
+            case $AY_EN in
+              01) AY="Ocak";;
+              02) AY="Şubat";;
+              03) AY="Mart";;
+              04) AY="Nisan";;
+              05) AY="Mayıs";;
+              06) AY="Haziran";;
+              07) AY="Temmuz";;
+              08) AY="Ağustos";;
+              09) AY="Eylül";;
+              10) AY="Ekim";;
+              11) AY="Kasım";;
+              12) AY="Aralık";;
+            esac
+
+            DATE_TR="$GUN $AY $YIL"
+
+            # Basit açıklama üret
+            if echo "$TITLE" | grep -iq "hotfix"; then
+              ACIKLAMA="Küçük hatalar düzeltildi ve oyun daha stabil hale getirildi."
+            elif echo "$TITLE" | grep -iqE "update|patch"; then
+              ACIKLAMA="Yeni içerikler ve önemli sistem güncellemeleri eklendi."
+            else
+              ACIKLAMA="Yeni bir duyuru veya içerik paylaşımı yapıldı."
+            fi
+
+            # Renk
             if echo "$TITLE" | grep -iqE "update|patch"; then
               RENK=16711680
-              DURUM="🔥 BÜYÜK UPDATE"
+              DURUM="🔥 BÜYÜK GÜNCELLEME"
             else
               RENK=65280
               DURUM="🟢 Güncelleme"
@@ -61,12 +90,12 @@ jobs:
             echo "{
               \"embeds\": [{
                 \"title\": \"$DURUM\",
-                \"description\": \"📅 $DATE\n\n🆕 $TITLE\",
+                \"description\": \"📅 $DATE_TR\n\n🆕 $TITLE\n\n🧠 $ACIKLAMA\",
                 \"url\": \"$LINK\",
                 \"color\": $RENK,
                 \"thumbnail\": {\"url\": \"$THUMB\"},
                 \"image\": {\"url\": \"$RESIM\"},
-                \"footer\": {\"text\": \"SCUM Update Bot\"}
+                \"footer\": {\"text\": \"SCUM Türkçe Update Bot\"}
               }]
             }" > payload.json
 
