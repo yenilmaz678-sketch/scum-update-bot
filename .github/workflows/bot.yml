@@ -1,4 +1,4 @@
-name: SCUM TR BOT
+name: SCUM SMART BOT
 
 on:
   workflow_dispatch:
@@ -20,32 +20,25 @@ jobs:
           grep -o '<link>.*</link>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > links.txt
           grep -o '<pubDate>.*</pubDate>' feed.xml | head -n 5 | sed 's/<[^>]*>//g' > dates.txt
 
-          head -n 1 titles.txt > baslik.txt
+          touch sent.txt
 
-      - name: Spam kontrol
-        run: |
-          YENI=$(cat baslik.txt)
-          ESKI=$(cat last.txt 2>/dev/null || echo "")
-
-          if [ "$YENI" = "$ESKI" ]; then
-            echo "SEND=false" >> $GITHUB_ENV
-          else
-            echo "SEND=true" >> $GITHUB_ENV
-          fi
-
-      - name: Discord gönder (SIRALI)
-        if: env.SEND == 'true'
+      - name: Yeni olanları gönder
         run: |
           RESIM="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
           THUMB="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/capsule_184x69.jpg"
 
           for i in 5 4 3 2 1
           do
-            RAW_DATE=$(sed -n "${i}p" dates.txt)
             TITLE=$(sed -n "${i}p" titles.txt)
             LINK=$(sed -n "${i}p" links.txt)
+            RAW_DATE=$(sed -n "${i}p" dates.txt)
 
             [ -z "$TITLE" ] && continue
+
+            # Daha önce atılmış mı?
+            if grep -Fxq "$TITLE" sent.txt; then
+              continue
+            fi
 
             # Türkçe tarih
             GUN=$(date -d "$RAW_DATE" +"%d")
@@ -69,7 +62,7 @@ jobs:
 
             DATE_TR="$GUN $AY $YIL"
 
-            # Başlık Türkçeleştirme
+            # Türkçeleştirme
             TITLE_TR=$(echo "$TITLE" \
               | sed 's/officially live/yayınlandı/i' \
               | sed 's/update/güncelleme/i' \
@@ -85,7 +78,7 @@ jobs:
               ACIKLAMA="Yeni bir duyuru veya içerik paylaşımı yapıldı."
             fi
 
-            # Renk & durum
+            # Renk
             if echo "$TITLE" | grep -iqE "update|patch"; then
               RENK=16711680
               DURUM="🔥 BÜYÜK GÜNCELLEME"
@@ -107,12 +100,17 @@ jobs:
 
             curl -X POST -H "Content-Type: application/json" \
             --data @payload.json \
-           https://discord.com/api/webhooks/1501336581766905967/RuuRcbC0UaP72dD2qzfgftno3Y-Jw3ksc2TmIYF5sztqkNszGh8V-wEhImjDwR0z6Evl
+            https://discord.com/api/webhooks/1501336581766905967/RuuRcbC0UaP72dD2qzfgftno3Y-Jw3ksc2TmIYF5sztqkNszGh8V-wEhImjDwR0z6Evl
+
+            echo "$TITLE" >> sent.txt
 
             sleep 2
           done
 
       - name: Kaydet
-        if: env.SEND == 'true'
         run: |
-          cp baslik.txt last.txt
+          git config user.name "bot"
+          git config user.email "bot@bot.com"
+          git add sent.txt
+          git commit -m "update history" || true
+          git push || true
