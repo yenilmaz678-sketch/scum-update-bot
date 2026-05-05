@@ -1,9 +1,9 @@
-name: SCUM Ultimate Fix Bot
+name: SCUM PRO UPDATE BOT
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "*/10 * * * *"  # 10 dakikada bir kontrol (daha hızlı)
 
 jobs:
   run:
@@ -12,18 +12,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Haber al
+      - name: Haberleri çek
         run: |
           curl -s https://store.steampowered.com/feeds/news/app/513710/ > feed.xml || true
 
-          BASLIK=$(grep -oP '<title>.*?</title>' feed.xml 2>/dev/null | sed -n '2p' | sed 's/<[^>]*>//g')
-          LINK=$(grep -oP '<link>.*?</link>' feed.xml 2>/dev/null | sed -n '2p' | sed 's/<[^>]*>//g')
+          grep -oP '<title>.*?</title>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > titles.txt
+          grep -oP '<link>.*?</link>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > links.txt
 
-          [ -z "$BASLIK" ] && BASLIK="Yeni SCUM güncellemesi"
-          [ -z "$LINK" ] && LINK="https://store.steampowered.com/app/513710"
-
-          echo "$BASLIK" > baslik.txt
-          echo "$LINK" > link.txt
+          head -n 1 titles.txt > baslik.txt
+          head -n 1 links.txt > link.txt
 
       - name: Spam kontrol
         run: |
@@ -36,44 +33,20 @@ jobs:
             echo "SEND=true" >> $GITHUB_ENV
           fi
 
-      - name: İçerik çek (hata korumalı)
+      - name: Liste hazırla
         if: env.SEND == 'true'
         run: |
-          LINK=$(cat link.txt)
-          curl -s "$LINK" > page.html || true
+          paste titles.txt links.txt | awk '{print "• **" $1 "**\n" $2 "\n"}' > liste.txt
 
-          grep -oP '<li>.*?</li>' page.html 2>/dev/null | sed 's/<[^>]*>//g' > raw.txt || true
-
-          # boşsa fallback
-          if [ ! -s raw.txt ]; then
-            echo "Yeni güncelleme yayınlandı." > raw.txt
-          fi
-
-      - name: Akıllı özet
+      - name: Büyük update kontrol
         if: env.SEND == 'true'
         run: |
-          BUG=$(grep -i "fix" raw.txt 2>/dev/null | head -n 3)
-          PERF=$(grep -i "performance" raw.txt 2>/dev/null | head -n 2)
-          CONTENT=$(grep -iE "added|new" raw.txt 2>/dev/null | head -n 3)
+          BASLIK=$(cat baslik.txt)
 
-          echo "🔧 ÖZET:" > ozet.txt
-
-          if [ ! -z "$CONTENT" ]; then
-            echo "" >> ozet.txt
-            echo "🆕 Yeni:" >> ozet.txt
-            echo "$CONTENT" | sed 's/^/• /' >> ozet.txt
-          fi
-
-          if [ ! -z "$BUG" ]; then
-            echo "" >> ozet.txt
-            echo "🐛 Fix:" >> ozet.txt
-            echo "$BUG" | sed 's/^/• /' >> ozet.txt
-          fi
-
-          if [ ! -z "$PERF" ]; then
-            echo "" >> ozet.txt
-            echo "⚡ Performans:" >> ozet.txt
-            echo "$PERF" | sed 's/^/• /' >> ozet.txt
+          if echo "$BASLIK" | grep -iE "patch|update|hotfix|major"; then
+            echo "BUYUK=true" >> $GITHUB_ENV
+          else
+            echo "BUYUK=false" >> $GITHUB_ENV
           fi
 
       - name: Discord gönder
@@ -81,23 +54,31 @@ jobs:
         run: |
           BASLIK=$(cat baslik.txt)
           LINK=$(cat link.txt)
-          OZET=$(cat ozet.txt)
+          LISTE=$(cat liste.txt)
+
+          if [ "$BUYUK" = "true" ]; then
+            RENK=16711680   # kırmızı (büyük update)
+            BASLIK2="🔥 BÜYÜK UPDATE!"
+          else
+            RENK=65280      # yeşil (küçük update)
+            BASLIK2="🟢 Küçük Güncelleme"
+          fi
 
           RESIM="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
 
           PAYLOAD=$(printf '{
             "embeds":[{
-              "title":"📢 SCUM UPDATE",
-              "description":"**%s**\n\n%s",
+              "title":"%s",
+              "description":"📢 **%s**\n\n📜 Son Güncellemeler:\n\n%s\n🔗 Detay: %s",
               "url":"%s",
-              "color":16711680,
+              "color":%s,
               "image":{"url":"%s"}
             }]
-          }' "$BASLIK" "$OZET" "$LINK" "$RESIM")
+          }' "$BASLIK2" "$BASLIK" "$LISTE" "$LINK" "$LINK" "$RENK" "$RESIM")
 
           curl -s -X POST -H "Content-Type: application/json" \
           -d "$PAYLOAD" \
-          https://discord.com/api/webhooks/1499488095429726227/iL7B7POBmgpLHalVECNxyAUGcv90aX3LOw1gVyGB30kLOk8wHvShxyMPpRqVqRvEY1XR
+         https://discord.com/api/webhooks/1501336581766905967/RuuRcbC0UaP72dD2qzfgftno3Y-Jw3ksc2TmIYF5sztqkNszGh8V-wEhImjDwR0z6Evl
 
       - name: Kaydet
         if: env.SEND == 'true'
