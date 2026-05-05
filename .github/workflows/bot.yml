@@ -14,22 +14,18 @@ jobs:
 
       - name: Haberleri çek
         run: |
-          set +e
-
           curl -s https://store.steampowered.com/feeds/news/app/513710/ > feed.xml
 
-          grep -o '<title>.*</title>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > titles.txt || true
-          grep -o '<link>.*</link>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > links.txt || true
+          grep -o '<title>.*</title>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > titles.txt
+          grep -o '<link>.*</link>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > links.txt
 
-          head -n 1 titles.txt > baslik.txt || echo "SCUM Update" > baslik.txt
-          head -n 1 links.txt > link.txt || echo "https://store.steampowered.com/app/513710" > link.txt
+          head -n 1 titles.txt > baslik.txt
+          head -n 1 links.txt > link.txt
 
       - name: Spam kontrol
         run: |
-          set +e
-
           YENI=$(cat baslik.txt)
-          ESKI=$(cat last.txt 2>/dev/null)
+          ESKI=$(cat last.txt 2>/dev/null || echo "")
 
           if [ "$YENI" = "$ESKI" ]; then
             echo "SEND=false" >> $GITHUB_ENV
@@ -40,9 +36,7 @@ jobs:
       - name: Liste hazırla
         if: env.SEND == 'true'
         run: |
-          set +e
-
-          paste titles.txt links.txt > tmp.txt || true
+          paste titles.txt links.txt > tmp.txt
 
           > liste.txt
           while read line; do
@@ -56,36 +50,17 @@ jobs:
       - name: Discord gönder
         if: env.SEND == 'true'
         run: |
-          set +e
-
           BASLIK=$(cat baslik.txt)
           LINK=$(cat link.txt)
           LISTE=$(cat liste.txt)
 
-          RESIM="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
-
           curl -X POST -H "Content-Type: application/json" \
           -d "{
-            \"embeds\": [{
-              \"title\": \"SCUM UPDATE\",
-              \"description\": \"$BASLIK\n\n$LISTE\nDetay: $LINK\",
-              \"url\": \"$LINK\",
-              \"color\": 16711680,
-              \"image\": {\"url\": \"$RESIM\"}
-            }]
+            \"content\": \"📢 SCUM UPDATE\n\n$BASLIK\n\n$LISTE\nDetay: $LINK\"
           }" \
-          $DISCORD_WEBHOOK || true
+          
+          #################################################
+          # 🔴 WEBHOOK BURAYA YAPIŞTIRACAKSIN
+          #################################################
+          
           https://discord.com/api/webhooks/1501336581766905967/RuuRcbC0UaP72dD2qzfgftno3Y-Jw3ksc2TmIYF5sztqkNszGh8V-wEhImjDwR0z6Evl
-      - name: Kaydet
-        if: env.SEND == 'true'
-        run: |
-          cp baslik.txt last.txt || true
-
-      - name: Push
-        if: env.SEND == 'true'
-        run: |
-          git config user.name "bot"
-          git config user.email "bot@bot.com"
-          git add last.txt
-          git commit -m "update" || true
-          git push || true
