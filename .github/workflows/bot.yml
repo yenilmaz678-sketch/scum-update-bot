@@ -1,4 +1,4 @@
-name: SCUM SMART BOT
+name: SCUM FULL PRO BOT
 
 on:
   workflow_dispatch:
@@ -16,18 +16,21 @@ jobs:
         run: |
           curl -s https://store.steampowered.com/feeds/news/app/513710/ > feed.xml
 
-          grep -o '<title>.*</title>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > titles.txt
-          grep -o '<link>.*</link>' feed.xml | sed '1d' | head -n 5 | sed 's/<[^>]*>//g' > links.txt
-          grep -o '<pubDate>.*</pubDate>' feed.xml | head -n 5 | sed 's/<[^>]*>//g' > dates.txt
+          grep -o '<title>.*</title>' feed.xml | sed '1d' | head -n 10 | sed 's/<[^>]*>//g' > titles.txt
+          grep -o '<link>.*</link>' feed.xml | sed '1d' | head -n 10 | sed 's/<[^>]*>//g' > links.txt
+          grep -o '<pubDate>.*</pubDate>' feed.xml | head -n 10 | sed 's/<[^>]*>//g' > dates.txt
 
           touch sent.txt
 
-      - name: Yeni olanları gönder
+      - name: Update gönder
         run: |
+          WEBHOOK="https://discord.com/api/webhooks/BURAYA_WEBHOOK_LINKIN"
+          ROLE_ID="BURAYA_ROLE_ID"
+
           RESIM="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
           THUMB="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/capsule_184x69.jpg"
 
-          for i in 5 4 3 2 1
+          for i in 10 9 8 7 6 5 4 3 2 1
           do
             TITLE=$(sed -n "${i}p" titles.txt)
             LINK=$(sed -n "${i}p" links.txt)
@@ -35,7 +38,12 @@ jobs:
 
             [ -z "$TITLE" ] && continue
 
-            # Daha önce atılmış mı?
+            # SADECE GERÇEK UPDATE
+            if ! echo "$TITLE" | grep -iqE "update|patch|hotfix|wipe"; then
+              continue
+            fi
+
+            # Daha önce gönderildi mi
             if grep -Fxq "$TITLE" sent.txt; then
               continue
             fi
@@ -64,30 +72,31 @@ jobs:
 
             # Türkçeleştirme
             TITLE_TR=$(echo "$TITLE" \
-              | sed 's/officially live/yayınlandı/i' \
               | sed 's/update/güncelleme/i' \
               | sed 's/patch/yama/i' \
-              | sed 's/hotfix/düzeltme/i')
+              | sed 's/hotfix/düzeltme/i' \
+              | sed 's/wipe/sıfırlama/i')
 
-            # Açıklama
-            if echo "$TITLE" | grep -iq "hotfix"; then
-              ACIKLAMA="Küçük hatalar düzeltildi ve oyun daha stabil hale getirildi."
-            elif echo "$TITLE" | grep -iqE "update|patch"; then
-              ACIKLAMA="Yeni içerikler ve önemli sistem güncellemeleri eklendi."
-            else
-              ACIKLAMA="Yeni bir duyuru veya içerik paylaşımı yapıldı."
-            fi
-
-            # Renk
-            if echo "$TITLE" | grep -iqE "update|patch"; then
+            # WIPE kontrol
+            if echo "$TITLE" | grep -iq "wipe"; then
+              DURUM="🚨 WIPE GELDİ!"
               RENK=16711680
-              DURUM="🔥 BÜYÜK GÜNCELLEME"
-            else
+              ACIKLAMA="Sunucu sıfırlandı! Herkes sıfırdan başlıyor."
+              PING="<@&$ROLE_ID>"
+            elif echo "$TITLE" | grep -iq "hotfix"; then
+              DURUM="🛠️ DÜZELTME"
               RENK=65280
-              DURUM="🟢 Güncelleme"
+              ACIKLAMA="Hatalar düzeltildi ve stabilite artırıldı."
+              PING=""
+            else
+              DURUM="🔥 BÜYÜK GÜNCELLEME"
+              RENK=16753920
+              ACIKLAMA="Yeni içerikler ve büyük değişiklikler eklendi."
+              PING="<@&$ROLE_ID>"
             fi
 
             echo "{
+              \"content\": \"$PING\",
               \"embeds\": [{
                 \"title\": \"$DURUM\",
                 \"description\": \"📅 $DATE_TR\n\n🆕 $TITLE_TR\n\n🧠 $ACIKLAMA\",
