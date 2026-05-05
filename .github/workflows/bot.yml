@@ -1,4 +1,4 @@
-name: SCUM PRO EMBED BOT
+name: SCUM MULTI MESSAGE BOT
 
 on:
   workflow_dispatch:
@@ -21,9 +21,8 @@ jobs:
           grep -o '<pubDate>.*</pubDate>' feed.xml | head -n 5 | sed 's/<[^>]*>//g' > dates.txt
 
           head -n 1 titles.txt > baslik.txt
-          head -n 1 links.txt > link.txt
 
-      - name: Spam kontrol
+      - name: Spam kontrol (sadece en yeniyi baz alır)
         run: |
           YENI=$(cat baslik.txt)
           ESKI=$(cat last.txt 2>/dev/null || echo "")
@@ -34,10 +33,11 @@ jobs:
             echo "SEND=true" >> $GITHUB_ENV
           fi
 
-      - name: Liste hazırla (PRO)
+      - name: Discord tek tek gönder
         if: env.SEND == 'true'
         run: |
-          > liste.txt
+          RESIM="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
+          THUMB="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/capsule_184x69.jpg"
 
           for i in {1..5}
           do
@@ -45,60 +45,39 @@ jobs:
             TITLE=$(sed -n "${i}p" titles.txt)
             LINK=$(sed -n "${i}p" links.txt)
 
+            # boşsa geç
+            [ -z "$TITLE" ] && continue
+
             DATE=$(date -d "$RAW_DATE" +"%d %b %Y" 2>/dev/null || echo "$RAW_DATE")
 
-            echo "📅 **$DATE**" >> liste.txt
-            echo "🆕 $TITLE" >> liste.txt
-            echo "🔗 $LINK" >> liste.txt
-            echo "━━━━━━━━━━━━━━" >> liste.txt
-            echo "" >> liste.txt
+            if echo "$TITLE" | grep -iqE "update|patch"; then
+              RENK=16711680
+              DURUM="🔥 BÜYÜK UPDATE"
+            else
+              RENK=65280
+              DURUM="🟢 Güncelleme"
+            fi
+
+            echo "{
+              \"embeds\": [{
+                \"title\": \"$DURUM\",
+                \"description\": \"📅 $DATE\n\n🆕 $TITLE\",
+                \"url\": \"$LINK\",
+                \"color\": $RENK,
+                \"thumbnail\": {\"url\": \"$THUMB\"},
+                \"image\": {\"url\": \"$RESIM\"},
+                \"footer\": {\"text\": \"SCUM Update Bot\"}
+              }]
+            }" > payload.json
+
+            curl -X POST -H "Content-Type: application/json" \
+            --data @payload.json \
+            https://discord.com/api/webhooks/1501336581766905967/RuuRcbC0UaP72dD2qzfgftno3Y-Jw3ksc2TmIYF5sztqkNszGh8V-wEhImjDwR0z6Evl
+
+            sleep 2
           done
-
-      - name: Discord PRO gönder
-        if: env.SEND == 'true'
-        run: |
-          BASLIK=$(cat baslik.txt)
-          LINK=$(cat link.txt)
-          LISTE=$(cat liste.txt)
-
-          RESIM="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/header.jpg"
-          THUMB="https://cdn.cloudflare.steamstatic.com/steam/apps/513710/capsule_184x69.jpg"
-
-          # Büyük update kontrol
-          if echo "$BASLIK" | grep -iqE "update|patch"; then
-            RENK=16711680
-            DURUM="🔥 BÜYÜK GÜNCELLEME"
-          else
-            RENK=65280
-            DURUM="🟢 Küçük Güncelleme"
-          fi
-
-          echo "{
-            \"embeds\": [{
-              \"title\": \"$DURUM\",
-              \"description\": \"$LISTE\",
-              \"url\": \"$LINK\",
-              \"color\": $RENK,
-              \"thumbnail\": {\"url\": \"$THUMB\"},
-              \"image\": {\"url\": \"$RESIM\"},
-              \"footer\": {\"text\": \"SCUM Sunucu Botu • Otomatik Güncelleme Sistemi\"}
-            }]
-          }" > payload.json
-
-          curl -X POST -H "Content-Type: application/json" \
-          --data @payload.json \
-          https://discord.com/api/webhooks/1501336581766905967/RuuRcbC0UaP72dD2qzfgftno3Y-Jw3ksc2TmIYF5sztqkNszGh8V-wEhImjDwR0z6Evl
 
       - name: Kaydet
         if: env.SEND == 'true'
         run: |
           cp baslik.txt last.txt
-
-      - name: Push
-        if: env.SEND == 'true'
-        run: |
-          git config user.name "bot"
-          git config user.email "bot@bot.com"
-          git add last.txt
-          git commit -m "update" || true
-          git push || true
